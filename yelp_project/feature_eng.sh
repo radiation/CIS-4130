@@ -1,3 +1,5 @@
+gsutil cp feature_eng.py gs://cis-4130-bwc/scripts/
+
 gcloud dataproc jobs submit pyspark gs://cis-4130-bwc/scripts/feature_eng.py \
     --cluster=cluster-f6d4 \
     --region=us-central1 \

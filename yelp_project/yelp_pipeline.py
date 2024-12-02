@@ -1,7 +1,7 @@
 from google.cloud import storage
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when
-from pyspark.ml.feature import VectorAssembler, StandardScaler
+from pyspark.ml.feature import VectorAssembler, MinMaxScaler
 from pyspark.ml.classification import LogisticRegression
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
 from pyspark.ml import Pipeline
@@ -42,8 +42,8 @@ numeric_cols = [
 # Define feature assembler
 vector_assembler = VectorAssembler(inputCols=numeric_cols, outputCol="numeric_features")
 
-# Add scaling for numeric features
-scaler = StandardScaler(inputCol="numeric_features", outputCol="scaled_features", withMean=False, withStd=True)
+# Add MinMaxScaler for numeric features
+scaler = MinMaxScaler(inputCol="numeric_features", outputCol="scaled_features")
 
 # Prepare label column
 data = data.withColumn("label", when(col("is_high_star") == 1, 1).otherwise(0))
@@ -78,6 +78,7 @@ bucket_name = args.results_path.split("/")[2]  # Extract the bucket name from re
 destination_path = "/".join(args.results_path.split("/")[3:] + ["evaluation_results.txt"])  # Path inside the bucket
 
 write_to_gcs(bucket_name, destination_path, evaluation_results_content)
+
 # Save transformed data
 predictions_path = f"{args.output_path}/predictions"  # Change this to a dedicated predictions folder
 predictions.write.mode("overwrite").parquet(predictions_path)
