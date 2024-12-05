@@ -63,6 +63,23 @@ def feature_engineering(reviews, business, users):
         "is_high_star", F.when(F.col("review_stars") >= 4, 1).otherwise(0)
     )
 
+    # Calculate counts dynamically
+    class_counts = enriched_data.groupBy("is_high_star").count().collect()
+
+    # Calculate class weights
+    minority_count = next(row["count"] for row in class_counts if row["is_high_star"] == 0)
+    majority_count = next(row["count"] for row in class_counts if row["is_high_star"] == 1)
+    total_count = minority_count + majority_count
+
+    weight_for_minority = total_count / (2 * minority_count)
+    weight_for_majority = total_count / (2 * majority_count)
+
+    # Add weight column
+    enriched_data = enriched_data.withColumn(
+        "class_weight",
+        F.when(F.col("is_high_star") == 1, weight_for_majority).otherwise(weight_for_minority)
+    )
+
     log_transformation("NORMALIZE", "Normalizing business and user review counts.")
     max_business_review_count = enriched_data.agg(F.max("business_review_count")).first()[0]
     max_user_review_count = enriched_data.agg(F.max("user_review_count")).first()[0]
@@ -101,29 +118,6 @@ def save_to_parquet(df, output_path):
     log_transformation("SAVE", f"Saving transformed data to {output_path}.")
     df.write.mode("overwrite").parquet(output_path)
 
-# Generate and save visualizations
-def generate_visualizations(df, output_path):
-    log_transformation("VISUALIZATION", "Generating visualizations for key features.")
-    pandas_df = df.select("review_text_length", "review_stars", "business_review_count", "user_review_count").toPandas()
-
-    plt.figure(figsize=(10, 6))
-    pandas_df["review_text_length"].plot.hist(bins=50, alpha=0.7, title="Review Text Length Distribution")
-    plt.savefig(f"{output_path}/review_text_length_distribution.png")
-
-    plt.figure(figsize=(10, 6))
-    pandas_df["review_stars"].value_counts().plot.bar(title="Review Stars Distribution")
-    plt.savefig(f"{output_path}/review_stars_distribution.png")
-
-    plt.figure(figsize=(10, 6))
-    pandas_df["business_review_count"].plot.hist(bins=50, alpha=0.7, title="Business Review Count Distribution")
-    plt.savefig(f"{output_path}/business_review_count_distribution.png")
-
-    plt.figure(figsize=(10, 6))
-    pandas_df["user_review_count"].plot.hist(bins=50, alpha=0.7, title="User Review Count Distribution")
-    plt.savefig(f"{output_path}/user_review_count_distribution.png")
-
-    log_transformation("VISUALIZATION", f"Visualizations saved to {output_path}.")
-
 if __name__ == "__main__":
     base_path = "gs://cis-4130-bwc/cleaned"
     output_path = "gs://cis-4130-bwc/trusted"
@@ -136,7 +130,6 @@ if __name__ == "__main__":
         log_transformation("START", "Starting feature engineering process.")
         transformed_data = feature_engineering(reviews, business, users)
         save_to_parquet(transformed_data, output_path)
-        generate_visualizations(transformed_data, viz_output_path)
         log_transformation("COMPLETE", "Feature engineering process completed.")
     finally:
         spark.stop()

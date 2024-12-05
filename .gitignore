@@ -2,3 +2,4 @@ venv
 **/*.log
 .DS_Store
 troubleshooting/
+graphs/

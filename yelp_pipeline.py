@@ -50,7 +50,11 @@ data = data.withColumn("label", when(col("is_high_star") == 1, 1).otherwise(0))
 train_data, test_data = data.randomSplit([0.8, 0.2], seed=42)
 
 # Define a Logistic Regression model
-lr = LogisticRegression(featuresCol="scaled_features", labelCol="label")
+lr = LogisticRegression(
+    featuresCol="scaled_features", 
+    weightCol="class_weight",
+    labelCol="label"
+)
 
 # Define a parameter grid for cross-validation
 param_grid = ParamGridBuilder() \
